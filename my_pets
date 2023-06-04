@@ -1,0 +1,173 @@
+import pytest
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from settings import valid_email, valid_password
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+@pytest.fixture(autouse=True)
+def testing():
+    pytest.driver = webdriver.Chrome('./chromedriver.exe')
+    # Переходим на страницу авторизации
+    pytest.driver.get('http://petfriends.skillfactory.ru/login')
+
+    yield
+
+    pytest.driver.quit()
+
+
+@pytest.fixture()
+def my_pets():
+   element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.ID, "email")))
+   # Вводим email
+   pytest.driver.find_element(By.ID, 'email').send_keys(valid_email)
+
+   element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.ID, "pass")))
+   # Вводим пароль
+   pytest.driver.find_element(By.ID, 'pass').send_keys(valid_password)
+
+   element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, "button[type='submit']")))
+   # Нажимаем на кнопку входа в аккаунт
+   pytest.driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+
+   element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.LINK_TEXT, "Мои питомцы")))
+   # Нажимаем на ссылку "Мои питомцы"
+   pytest.driver.find_element(By.LINK_TEXT, "Мои питомцы").click()
+
+
+
+#Присутствуют все питомцы
+def test_all_pets_are_present(my_pets):
+
+    element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".\\.col-sm-4.left")))
+    # Сохраняем в переменную pets_count элементы статистики
+    pets_count = pytest.driver.find_elements(By.CSS_SELECTOR, ".\\.col-sm-4.left")
+
+    element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".table.table-hover tbody tr")))
+
+    # Сохраняем в переменную pets элементы карточек питомцев
+    pets = pytest.driver.find_elements(By.CSS_SELECTOR, '.table.table-hover tbody tr')
+
+    # Получаем количество питомцев из данных статистики
+    number = pets_count[0].text.split('\n')
+    number = number[1].split(' ')
+    number = int(number[1])
+
+    # Получаем количество карточек питомцев
+    number_of_pets = len(pets)
+
+    # Настраиваем неявные ожидания:
+    pytest.driver.implicitly_wait(10)
+
+    # Проверяем что количество питомцев из статистики совпадает с количеством карточек питомцев
+    assert number == number_of_pets
+
+
+
+
+#У половины(или больше) питомцев есть фото
+def test_pet_has_a_photo(my_pets):
+
+    # Определяем фото
+    images = pytest.driver.find_elements(By.CSS_SELECTOR, '.table.table-hover img')
+
+    element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".\\.col-sm-4.left")))
+
+    # Сохраняем в переменную pets_count элементы статистики
+    pets_count = pytest.driver.find_elements(By.CSS_SELECTOR, ".\\.col-sm-4.left")
+
+    # Сохраняем в переменную images элементы с атрибутом img
+    images = pytest.driver.find_elements(By.CSS_SELECTOR, '.table.table-hover img')
+
+    # Получаем количество питомцев из данных статистики
+    number = pets_count[0].text.split('\n')
+    number = number[1].split(' ')
+    number = int(number[1])
+
+    # Находим половину от количества питомцев
+    half = number // 2
+
+    # Настраиваем неявные ожидания:
+    pytest.driver.implicitly_wait(10)
+
+    # Находим количество питомцев с фотографией
+    number_а_photos = 0
+
+    for i in range(len(images)):
+        if images[i].get_attribute('src') != '':
+            number_а_photos += 1
+
+    # Проверяем что количество питомцев с фотографией больше или равно половине количества питомцев
+    assert number_а_photos >= half
+
+
+
+
+#У всех питомцев есть имя, возраст и порода
+def test_show_my_pets(my_pets):
+
+    element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".table.table-hover tbody tr")))
+    # Сохраняем в переменную pet_data элементы с данными о моих питомцах
+    pet_data = pytest.driver.find_elements(By.CSS_SELECTOR, '.table.table-hover tbody tr')
+
+    # Настраиваем переменную явного ожидания:
+    wait = WebDriverWait(pytest.driver, 10)
+
+    # Ожидаем, что данные всех питомцев, найденных локатором css_locator = '.table.table-hover tbody tr', видны на странице:
+    for i in range(len(pet_data)):
+        assert wait.until(EC.visibility_of(pet_data[i]))
+
+    # Ищем в теле таблицы все имена питомцев и ожидаем увидеть их на странице:
+    name_my_pets = pytest.driver.find_elements(By.XPATH, '//tbody/tr/td[1]')
+    for i in range(len(name_my_pets)):
+        assert wait.until(EC.visibility_of(name_my_pets[i]))
+
+    # Ищем в теле таблицы все породы питомцев и ожидаем увидеть их на странице:
+    type_my_pets = pytest.driver.find_elements(By.XPATH, '//tbody/tr/td[2]')
+    for i in range(len(type_my_pets)):
+        assert wait.until(EC.visibility_of(type_my_pets[i]))
+
+    # Ищем в теле таблицы все данные возраста питомцев и ожидаем увидеть их на странице:
+    age_my_pets = pytest.driver.find_elements(By.XPATH, '//tbody/tr/td[3]')
+    for i in range(len(age_my_pets)):
+        assert wait.until(EC.visibility_of(age_my_pets[i]))
+
+
+
+#У всех питомцев разные имена
+def test_different_names(my_pets):
+
+    element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".table.table-hover tbody tr")))
+    # Сохраняем в переменную pet_data элементы с данными о моих питомцах
+    name_my_pets = pytest.driver.find_elements(By.CSS_SELECTOR, '.table.table-hover tbody tr')
+
+    # Настраиваем неявные ожидания:
+    pytest.driver.implicitly_wait(10)
+
+    # Проверяем, что у всех питомцев разные имена:
+    list_name_my_pets = [] # создаем список для хранения имен питомцев
+    for i in range(len(name_my_pets)):
+        list_name_my_pets.append(name_my_pets[i].text)
+    set_pet_data = set(list_name_my_pets)  # преобразовываем список в множество для избежания дубликатов
+    assert len(list_name_my_pets) == len(set_pet_data)  # сравниваем длину списка и множества
+
+
+#В списке нет повторяющихся питомцев
+def test_no_duplicate_pets(my_pets):
+
+    # Устанавливаем явное ожидание
+    element = WebDriverWait(pytest.driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".table.table-hover tbody tr")))
+
+    # Сохраняем в переменную data_my_pets элементы с данными о питомцах
+    data_my_pets = pytest.driver.find_elements(By.CSS_SELECTOR, '.table.table-hover tbody tr')
+
+    # Настраиваем неявные ожидания:
+    pytest.driver.implicitly_wait(10)
+
+    # Проверяем, что в списке нет повторяющихся питомцев:
+    list_data_my_pets = [] # создаем список для хранения информации о питомцах
+    for i in range(len(data_my_pets)):
+        list_data = data_my_pets[i].text.split("\n")  # отделяем от данных питомца "х" удаления питомца
+        list_data_my_pets.append(list_data[0])  # выбираем элемент с данными питомца и добавляем его в список
+    set_data_my_pets = set(list_data_my_pets)  # преобразовываем список в множество для избежания дубликатов
+    assert len(list_data_my_pets) == len(set_data_my_pets)  # сравниваем длину списка и множества
